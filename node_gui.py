@@ -3,8 +3,6 @@ import math
 import uuid
 from dearpygui import dearpygui as dpg
 
-"""Node based calculator GUI."""
-
 
 # containers for the graph system
 nodes = {}
@@ -14,11 +12,6 @@ node_count = 0
 x_data = []
 y_data = []
 start_time = time.time()
-
-# themes for highlighting active nodes
-active_node_theme = dpg.add_theme()
-with dpg.theme_component(dpg.mvNode):
-    dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (0, 150, 250, 255))
 
 
 def _register_attr(node, attr):
@@ -31,50 +24,6 @@ def _link_lookup(attr):
         if l["dest"] == attr:
             return l["source"]
     return None
-
-
-def _find_widget_for_attr(node_tag, attr):
-    """Return widget associated with the given attribute if any."""
-    node = nodes.get(node_tag, {})
-    for key, value in node.items():
-        if key.endswith("_widget") and node.get(key[:-7]) == attr:
-            return value
-    return None
-
-
-def _toggle_attr_widget(attr, enable):
-    owner = attr_owner.get(attr)
-    if not owner:
-        return
-    widget = _find_widget_for_attr(owner, attr)
-    if widget and dpg.does_item_exist(widget):
-        if enable:
-            dpg.enable_item(widget)
-        else:
-            dpg.disable_item(widget)
-
-
-def _remove_existing_link(dest_attr):
-    for l in links:
-        if l["dest"] == dest_attr:
-            dpg.delete_item(l["id"])
-            links.remove(l)
-            dest_owner = attr_owner.get(dest_attr)
-            if dest_owner and dest_attr in nodes[dest_owner].get("links", {}):
-                del nodes[dest_owner]["links"][dest_attr]
-            _toggle_attr_widget(dest_attr, True)
-            break
-
-
-def _highlight_node(node_tag):
-    """Temporarily highlight an active node."""
-    if not dpg.does_item_exist(node_tag):
-        return
-    dpg.bind_item_theme(node_tag, active_node_theme)
-    dpg.set_frame_callback(
-        dpg.get_frame_count() + 1,
-        lambda: dpg.bind_item_theme(node_tag, 0) if dpg.does_item_exist(node_tag) else None,
-    )
 
 
 def _get_input_value(attr, widget=None):
@@ -92,7 +41,6 @@ def _get_input_value(attr, widget=None):
 def _evaluate_node(tag):
     node = nodes[tag]
     ntype = node["type"]
-    _highlight_node(tag)
 
     if ntype == "time":
         value = time.time() - start_time
@@ -132,9 +80,6 @@ def _evaluate_node(tag):
         x_data.append(time.time() - start_time)
         y_data.append(value)
         dpg.set_value(node["series"], [x_data, y_data])
-        if x_data:
-            start = max(0.0, x_data[-1] - 10)
-            dpg.set_axis_limits("plot_xaxis", start, x_data[-1])
     else:
         value = 0.0
 
@@ -150,13 +95,11 @@ def _process_graph():
 def link_callback(sender, app_data):
     source_attr = dpg.get_item_alias(app_data[0])
     dest_attr = dpg.get_item_alias(app_data[1])
-    _remove_existing_link(dest_attr)
     link_id = dpg.add_node_link(source_attr, dest_attr, parent=sender)
     links.append({"id": link_id, "source": source_attr, "dest": dest_attr})
     dest_owner = attr_owner.get(dest_attr)
     if dest_owner:
         nodes[dest_owner].setdefault("links", {})[dest_attr] = source_attr
-    _toggle_attr_widget(dest_attr, False)
 
 
 def delink_callback(sender, app_data):
@@ -166,7 +109,6 @@ def delink_callback(sender, app_data):
             dest_owner = attr_owner.get(link["dest"])
             if dest_owner and link["dest"] in nodes[dest_owner].get("links", {}):
                 del nodes[dest_owner]["links"][link["dest"]]
-            _toggle_attr_widget(link["dest"], True)
             links.remove(link)
             break
 
@@ -331,7 +273,7 @@ with dpg.window(label="Node Editor"):
 
 with dpg.window(label="Plot Window"):
     with dpg.plot(label="Sine", height=400, width=400):
-        dpg.add_plot_axis(dpg.mvXAxis, label="x", tag="plot_xaxis")
+        dpg.add_plot_axis(dpg.mvXAxis, label="x")
         with dpg.plot_axis(dpg.mvYAxis, label="y", tag="plot_yaxis"):
             dpg.add_line_series([], [], parent="plot_yaxis", tag="sine_series")
 
