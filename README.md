@@ -1,5 +1,8 @@
 # Codex_test_calc
 
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
+
 ## Usage
 
 Install dependencies:
