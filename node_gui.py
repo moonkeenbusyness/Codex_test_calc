@@ -93,11 +93,13 @@ def _process_graph():
 
 
 def link_callback(sender, app_data):
-    link_id = dpg.add_node_link(app_data[0], app_data[1], parent=sender)
-    links.append({"id": link_id, "source": app_data[0], "dest": app_data[1]})
-    dest_owner = attr_owner.get(app_data[1])
+    source_attr = dpg.get_item_alias(app_data[0])
+    dest_attr = dpg.get_item_alias(app_data[1])
+    link_id = dpg.add_node_link(source_attr, dest_attr, parent=sender)
+    links.append({"id": link_id, "source": source_attr, "dest": dest_attr})
+    dest_owner = attr_owner.get(dest_attr)
     if dest_owner:
-        nodes[dest_owner].setdefault("links", {})[app_data[1]] = app_data[0]
+        nodes[dest_owner].setdefault("links", {})[dest_attr] = source_attr
 
 
 def delink_callback(sender, app_data):
