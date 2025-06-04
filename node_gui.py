@@ -1,7 +1,13 @@
 import time
 import math
 import uuid
-from dearpygui import dearpygui as dpg
+import os
+
+try:
+    from dearpygui import dearpygui as dpg
+except Exception as e:  # handle import errors gracefully
+    dpg = None
+    print(f"Failed to import DearPyGui: {e}")
 
 """Node based calculator GUI."""
 
@@ -16,9 +22,15 @@ y_data = []
 start_time = time.time()
 
 # themes for highlighting active nodes
-active_node_theme = dpg.add_theme()
-with dpg.theme_component(dpg.mvNode):
-    dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (0, 150, 250, 255))
+active_node_theme = None
+
+def _create_theme():
+    global active_node_theme
+    if not dpg:
+        return
+    active_node_theme = dpg.add_theme()
+    with dpg.theme_component(dpg.mvNode):
+        dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (0, 150, 250, 255))
 
 
 def _register_attr(node, attr):
@@ -46,6 +58,8 @@ def _toggle_attr_widget(attr, enable):
     owner = attr_owner.get(attr)
     if not owner:
         return
+    if not dpg:
+        return
     widget = _find_widget_for_attr(owner, attr)
     if widget and dpg.does_item_exist(widget):
         if enable:
@@ -57,7 +71,8 @@ def _toggle_attr_widget(attr, enable):
 def _remove_existing_link(dest_attr):
     for l in links:
         if l["dest"] == dest_attr:
-            dpg.delete_item(l["id"])
+            if dpg:
+                dpg.delete_item(l["id"])
             links.remove(l)
             dest_owner = attr_owner.get(dest_attr)
             if dest_owner and dest_attr in nodes[dest_owner].get("links", {}):
@@ -68,6 +83,8 @@ def _remove_existing_link(dest_attr):
 
 def _highlight_node(node_tag):
     """Temporarily highlight an active node."""
+    if not dpg or active_node_theme is None:
+        return
     if not dpg.does_item_exist(node_tag):
         return
     dpg.bind_item_theme(node_tag, active_node_theme)
@@ -84,7 +101,7 @@ def _get_input_value(attr, widget=None):
         if "value" not in nodes[owner]:
             _evaluate_node(owner)
         return nodes[owner].get("value", 0.0)
-    if widget is not None and dpg.does_item_exist(widget):
+    if widget is not None and dpg and dpg.does_item_exist(widget):
         return dpg.get_value(widget)
     return 0.0
 
@@ -93,6 +110,10 @@ def _evaluate_node(tag):
     node = nodes[tag]
     ntype = node["type"]
     _highlight_node(tag)
+
+    if not dpg:
+        node["value"] = 0.0
+        return
 
     if ntype == "time":
         value = time.time() - start_time
@@ -142,6 +163,8 @@ def _evaluate_node(tag):
 
 
 def _process_graph():
+    if not dpg:
+        return
     for tag in list(nodes.keys()):
         _evaluate_node(tag)
     dpg.set_frame_callback(dpg.get_frame_count() + 1, _process_graph)
@@ -301,46 +324,65 @@ def add_plot_node():
 
 # Build UI
 
-dpg.create_context()
+def main():
+    if not dpg:
+        print("DearPyGui is not available. Exiting.")
+        return
+    if os.name != "nt" and not os.environ.get("DISPLAY"):
+        print("No display available. GUI will not start.")
+        return
+    try:
+        dpg.create_context()
+        _create_theme()
 
-with dpg.window(label="Node Editor"):
-    with dpg.tab_bar():
-        with dpg.tab(label="Arithmetic"):
-            dpg.add_button(label="Add", callback=lambda: add_arith_node("add"))
-            dpg.add_button(label="Sub", callback=lambda: add_arith_node("sub"))
-            dpg.add_button(label="Mul", callback=lambda: add_arith_node("mul"))
-            dpg.add_button(label="Div", callback=lambda: add_arith_node("div"))
-        with dpg.tab(label="Trig"):
-            dpg.add_button(label="Sin", callback=lambda: add_trig_node("sin"))
-            dpg.add_button(label="Cos", callback=lambda: add_trig_node("cos"))
-            dpg.add_button(label="Tan", callback=lambda: add_trig_node("tan"))
-        with dpg.tab(label="Const"):
-            dpg.add_button(label="Const", callback=add_const_node)
-            dpg.add_button(label="Pi", callback=lambda: add_const_node(math.pi, "Pi"))
-            dpg.add_button(label="E", callback=lambda: add_const_node(math.e, "E"))
-        with dpg.tab(label="Display"):
-            dpg.add_button(label="Number", callback=add_display_node)
-            dpg.add_button(label="Plot", callback=add_plot_node)
-    dpg.add_button(label="Delete Selected", callback=delete_selected)
-    with dpg.node_editor(tag="node_editor", callback=link_callback, delink_callback=delink_callback):
-        t = add_time_node()
-        s = add_trig_node("sin")
-        p = add_plot_node()
-        dpg.add_node_link(nodes[t]["out"], nodes[s]["in"], parent="node_editor")
-        dpg.add_node_link(nodes[s]["out"], nodes[p]["in"], parent="node_editor")
+        with dpg.window(label="Node Editor"):
+            with dpg.tab_bar():
+                with dpg.tab(label="Arithmetic"):
+                    dpg.add_button(label="Add", callback=lambda: add_arith_node("add"))
+                    dpg.add_button(label="Sub", callback=lambda: add_arith_node("sub"))
+                    dpg.add_button(label="Mul", callback=lambda: add_arith_node("mul"))
+                    dpg.add_button(label="Div", callback=lambda: add_arith_node("div"))
+                with dpg.tab(label="Trig"):
+                    dpg.add_button(label="Sin", callback=lambda: add_trig_node("sin"))
+                    dpg.add_button(label="Cos", callback=lambda: add_trig_node("cos"))
+                    dpg.add_button(label="Tan", callback=lambda: add_trig_node("tan"))
+                with dpg.tab(label="Const"):
+                    dpg.add_button(label="Const", callback=add_const_node)
+                    dpg.add_button(label="Pi", callback=lambda: add_const_node(math.pi, "Pi"))
+                    dpg.add_button(label="E", callback=lambda: add_const_node(math.e, "E"))
+                with dpg.tab(label="Display"):
+                    dpg.add_button(label="Number", callback=add_display_node)
+                    dpg.add_button(label="Plot", callback=add_plot_node)
+            dpg.add_button(label="Delete Selected", callback=delete_selected)
+            with dpg.node_editor(tag="node_editor", callback=link_callback, delink_callback=delink_callback):
+                t = add_time_node()
+                s = add_trig_node("sin")
+                p = add_plot_node()
+                dpg.add_node_link(nodes[t]["out"], nodes[s]["in"], parent="node_editor")
+                dpg.add_node_link(nodes[s]["out"], nodes[p]["in"], parent="node_editor")
 
-with dpg.window(label="Plot Window"):
-    with dpg.plot(label="Sine", height=400, width=400):
-        dpg.add_plot_axis(dpg.mvXAxis, label="x", tag="plot_xaxis")
-        with dpg.plot_axis(dpg.mvYAxis, label="y", tag="plot_yaxis"):
-            dpg.add_line_series([], [], parent="plot_yaxis", tag="sine_series")
+        with dpg.window(label="Plot Window"):
+            with dpg.plot(label="Sine", height=400, width=400):
+                dpg.add_plot_axis(dpg.mvXAxis, label="x", tag="plot_xaxis")
+                with dpg.plot_axis(dpg.mvYAxis, label="y", tag="plot_yaxis"):
+                    dpg.add_line_series([], [], parent="plot_yaxis", tag="sine_series")
+
+        dpg.create_viewport(title="Node GUI", width=800, height=600)
+        dpg.setup_dearpygui()
+        dpg.show_viewport()
+
+        dpg.set_frame_callback(dpg.get_frame_count() + 1, _process_graph)
+
+        dpg.start_dearpygui()
+    except Exception as e:
+        print(f"Failed to start GUI: {e}")
+    finally:
+        try:
+            dpg.destroy_context()
+        except Exception:
+            pass
 
 
-dpg.create_viewport(title="Node GUI", width=800, height=600)
-dpg.setup_dearpygui()
-dpg.show_viewport()
+if __name__ == "__main__":
+    main()
 
-dpg.set_frame_callback(dpg.get_frame_count() + 1, _process_graph)
-
-dpg.start_dearpygui()
-dpg.destroy_context()
