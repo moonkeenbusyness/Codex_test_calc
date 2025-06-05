@@ -11,6 +11,8 @@ except Exception as e:  # handle import errors gracefully
 
 """Node based calculator GUI."""
 
+"""Node based calculator GUI."""
+
 
 # containers for the graph system
 nodes = {}
@@ -22,6 +24,7 @@ y_data = []
 start_time = time.time()
 
 # themes for highlighting active nodes
+
 active_node_theme = None
 
 def _create_theme():
@@ -59,6 +62,7 @@ def _toggle_attr_widget(attr, enable):
     owner = attr_owner.get(attr)
     if not owner:
         return
+
     if not dpg:
         return
     widget = _find_widget_for_attr(owner, attr)
@@ -72,8 +76,10 @@ def _toggle_attr_widget(attr, enable):
 def _remove_existing_link(dest_attr):
     for l in links:
         if l["dest"] == dest_attr:
+
             if dpg:
                 dpg.delete_item(l["id"])
+
             links.remove(l)
             dest_owner = attr_owner.get(dest_attr)
             if dest_owner and dest_attr in nodes[dest_owner].get("links", {}):
@@ -84,8 +90,10 @@ def _remove_existing_link(dest_attr):
 
 def _highlight_node(node_tag):
     """Temporarily highlight an active node."""
+
     if not dpg or active_node_theme is None:
         return
+
     if not dpg.does_item_exist(node_tag):
         return
     dpg.bind_item_theme(node_tag, active_node_theme)
@@ -112,9 +120,11 @@ def _evaluate_node(tag):
     ntype = node["type"]
     _highlight_node(tag)
 
+
     if not dpg:
         node["value"] = 0.0
         return
+
 
     if ntype == "time":
         value = time.time() - start_time
@@ -377,6 +387,7 @@ def main():
         t = add_time_node()
         s = add_trig_node("sin")
         p = add_plot_node()
+
         
         # リンクの作成
         link_id1 = dpg.add_node_link(nodes[t]["out"], nodes[s]["in"], parent="node_editor")
@@ -406,6 +417,7 @@ def main():
             dpg.destroy_context()
         except Exception:
             pass
+
 
 
 if __name__ == "__main__":
