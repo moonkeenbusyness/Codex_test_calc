@@ -28,9 +28,10 @@ def _create_theme():
     global active_node_theme
     if not dpg:
         return
-    active_node_theme = dpg.add_theme()
-    with dpg.theme_component(dpg.mvNode):
-        dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (0, 150, 250, 255))
+    
+    with dpg.theme() as active_node_theme:
+        with dpg.theme_component(dpg.mvNode):
+            dpg.add_theme_color(dpg.mvNodeCol_TitleBar, (0, 150, 250, 255))
 
 
 def _register_attr(node, attr):
@@ -333,9 +334,8 @@ def main():
         return
     try:
         dpg.create_context()
-        _create_theme()
-
-        with dpg.window(label="Node Editor"):
+        
+        with dpg.window(label="Node Editor", tag="primary_window"):
             with dpg.tab_bar():
                 with dpg.tab(label="Arithmetic"):
                     dpg.add_button(label="Add", callback=lambda: add_arith_node("add"))
@@ -355,27 +355,52 @@ def main():
                     dpg.add_button(label="Plot", callback=add_plot_node)
             dpg.add_button(label="Delete Selected", callback=delete_selected)
             with dpg.node_editor(tag="node_editor", callback=link_callback, delink_callback=delink_callback):
-                t = add_time_node()
-                s = add_trig_node("sin")
-                p = add_plot_node()
-                dpg.add_node_link(nodes[t]["out"], nodes[s]["in"], parent="node_editor")
-                dpg.add_node_link(nodes[s]["out"], nodes[p]["in"], parent="node_editor")
+                pass  # 初期ノードの作成は後で行う
 
-        with dpg.window(label="Plot Window"):
+        with dpg.window(label="Plot Window", tag="plot_window"):
             with dpg.plot(label="Sine", height=400, width=400):
                 dpg.add_plot_axis(dpg.mvXAxis, label="x", tag="plot_xaxis")
                 with dpg.plot_axis(dpg.mvYAxis, label="y", tag="plot_yaxis"):
                     dpg.add_line_series([], [], parent="plot_yaxis", tag="sine_series")
 
+        # テーマを作成（ウィンドウ作成後に）
+        _create_theme()
+        
+        # primary windowを設定
+        dpg.set_primary_window("primary_window", True)
+        
         dpg.create_viewport(title="Node GUI", width=800, height=600)
         dpg.setup_dearpygui()
         dpg.show_viewport()
+
+        # 初期ノードをここで作成
+        t = add_time_node()
+        s = add_trig_node("sin")
+        p = add_plot_node()
+        
+        # リンクの作成
+        link_id1 = dpg.add_node_link(nodes[t]["out"], nodes[s]["in"], parent="node_editor")
+        link_id2 = dpg.add_node_link(nodes[s]["out"], nodes[p]["in"], parent="node_editor")
+        
+        # リンク情報を保存
+        links.append({"id": link_id1, "source": nodes[t]["out"], "dest": nodes[s]["in"]})
+        links.append({"id": link_id2, "source": nodes[s]["out"], "dest": nodes[p]["in"]})
+        
+        # ノード間の依存関係を更新
+        nodes[s].setdefault("links", {})[nodes[s]["in"]] = nodes[t]["out"]
+        nodes[p].setdefault("links", {})[nodes[p]["in"]] = nodes[s]["out"]
+        
+        # 入力ウィジェットを無効化
+        _toggle_attr_widget(nodes[s]["in"], False)
+        _toggle_attr_widget(nodes[p]["in"], False)
 
         dpg.set_frame_callback(dpg.get_frame_count() + 1, _process_graph)
 
         dpg.start_dearpygui()
     except Exception as e:
         print(f"Failed to start GUI: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         try:
             dpg.destroy_context()
